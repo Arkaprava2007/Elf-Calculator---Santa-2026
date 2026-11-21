@@ -1,102 +1,80 @@
 package fileoperation
 
 
+import datastructure.PracticePuzzleAccessStructure
 import datastructure.PuzzleAccessStructure
 import java.io.File
 
 class PuzzleFileAccessOperation {
-    val PuzzleList: MutableList<PuzzleAccessStructure> = mutableListOf()
 
-    val puzzle_file = "/PUZZLES/puzzles.csv"
+    val puzzle_file = "PUZZLES/puzzles.csv"
 
-    fun ReadingPracticePuzzle(){
-        val file = File(puzzle_file)
+    fun splitCsvLine(line: String): List<String> {
+        val fields = ArrayList<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        var i = 0
 
-        file.forEachLine { line ->
-            line.drop(1)
-
-            val field = PuzzleAccessStructure(
-                id = "",
-                starting_values = listOf(),
-                targets = listOf(),
-                value_limit = 0L,
-                registers = 48,
-            )
-
-            var doubleCoteCount = 0
-            var itemCount = 0
-            var comaFetched = false
-            var inDoubleCote = false
-            var stringBuilder = ""
-            var listBuilder = mutableListOf<Long>()
-            var i = 0
-
-            while (i < line.length){
-                val ch = line[i]
-                when(ch){
-                    '"'->{
-                        doubleCoteCount++
-                        inDoubleCote = if (doubleCoteCount%2 == 0) false else true
-                    }
-                    ','->{
-                        if (inDoubleCote){
-                            i++
-                            comaFetched = true
-                        }
-                        else{
-                            when(itemCount){
-                                0 -> {
-                                    field.id = stringBuilder
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                                1 -> {
-                                    field.starting_values = listBuilder as List<Long>
-                                    itemCount++
-                                    listBuilder.clear()
-                                }
-                                2 ->{
-                                    field.targets = listBuilder as List<Long>
-                                    itemCount++
-                                    listBuilder.clear()
-                                }
-                                3->{
-                                    field.value_limit = stringBuilder.toLong()
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                                4->{
-                                    field.registers = stringBuilder.toInt()
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                            }
-                            i++
-                        }
-                    }
-                    '[' -> i++
-                    ']' -> i++
-                    else -> {
-                        if (inDoubleCote && !comaFetched){
-                            stringBuilder += ch
-                        }else if (inDoubleCote && comaFetched){
-                            listBuilder.addLast(stringBuilder.toLong())
-                            stringBuilder = ""
-                            stringBuilder += ch
-                            comaFetched = false
-                        } else if(!inDoubleCote){
-                            stringBuilder += ch
-                        }
-
-                        if (inDoubleCote && !comaFetched && line[i+1] == ']'){
-                            listBuilder.addLast(stringBuilder.toLong())
-                            stringBuilder = ""
-                        }
+        while (i < line.length) {
+            val ch = line[i]
+            when {
+                ch == '"' -> {
+                    // Handle escaped double quotes ("") inside a quoted field
+                    if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+                        current.append('"')
                         i++
+                    } else {
+                        inQuotes = !inQuotes
                     }
                 }
+                ch == ',' && !inQuotes -> {
+                    fields.add(current.toString().trim())
+                    current.setLength(0)
+                }
+                else -> current.append(ch)
             }
-            PuzzleList.addLast(field)
+            i++
         }
+        fields.add(current.toString().trim())
+        return fields
+    }
+
+    private fun parseLongList(raw: String): List<Long> {
+        val cleaned = raw.removeSurrounding("\"").trim().removeSurrounding("[", "]").trim()
+        if (cleaned.isEmpty()) return emptyList()
+        return cleaned.split(',').map { it.trim().toLong() }
+    }
+
+    fun ReadingPuzzle(): MutableList<PracticePuzzleAccessStructure> {
+        val puzzles = ArrayList<PracticePuzzleAccessStructure>()
+
+        File(puzzle_file).bufferedReader().useLines { lines ->
+            var isHeader = true
+
+            for (line in lines) {
+                if (isHeader) {
+                    isHeader = false
+                    continue
+                }
+                if (line.isBlank()) continue
+
+                val cols = splitCsvLine(line)
+                require(cols.size >= 8) { "Unexpected column count (${cols.size}) in line: $line" }
+
+                val puzzle = PracticePuzzleAccessStructure(
+                    id = cols[0],
+                    starting_values = parseLongList(cols[1]),
+                    targets = parseLongList(cols[2]),
+                    value_limit = cols[3].toLong(),
+                    registers = cols[4].toInt(),
+                    family = cols[5],
+                    design_tier = cols[6],
+                    lower_bound = cols[7].toInt()
+                )
+                puzzles.add(puzzle)
+            }
+        }
+
+        return puzzles
     }
 }

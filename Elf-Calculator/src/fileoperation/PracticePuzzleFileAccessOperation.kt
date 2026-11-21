@@ -4,115 +4,76 @@ import datastructure.PracticePuzzleAccessStructure
 import java.io.File
 
 class PracticePuzzleFileAccessOperation {
-    val PracticePuzzleList: MutableList<PracticePuzzleAccessStructure> = mutableListOf()
 
-    val puzzle_file = "/PUZZLES/practice_puzzles.csv"
 
-    fun ReadingPracticePuzzle(){
-        val file = File(puzzle_file)
+    val puzzle_file = "PUZZLES/practice_puzzles.csv"
 
-        file.forEachLine { line ->
-            line.drop(1)
+    fun splitCsvLine(line: String): List<String> {
+        val fields = ArrayList<String>()
+        val current = StringBuilder()
+        var inQuotes = false
+        var i = 0
 
-            val field = PracticePuzzleAccessStructure(
-                id = "",
-                starting_values = listOf(),
-                targets = listOf(),
-                value_limit = 0L,
-                registers = 48,
-                family = "",
-                design_tier = "",
-                lower_bound = 0
-            )
-
-            var doubleCoteCount = 0
-            var itemCount = 0
-            var comaFetched = false
-            var inDoubleCote = false
-            var stringBuilder = ""
-            var listBuilder = mutableListOf<Long>()
-            var i = 0
-
-            while (i < line.length){
-                val ch = line[i]
-                when(ch){
-                    '"'->{
-                        doubleCoteCount++
-                        inDoubleCote = if (doubleCoteCount%2 == 0) false else true
-                    }
-                    ','->{
-                        if (inDoubleCote){
-                            i++
-                            comaFetched = true
-                        }
-                        else{
-                            when(itemCount){
-                                0 -> {
-                                    field.id = stringBuilder
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                                1 -> {
-                                    field.starting_values = listBuilder as List<Long>
-                                    itemCount++
-                                    listBuilder.clear()
-                                }
-                                2 ->{
-                                    field.targets = listBuilder as List<Long>
-                                    itemCount++
-                                    listBuilder.clear()
-                                }
-                                3->{
-                                    field.value_limit = stringBuilder.toLong()
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                                4->{
-                                    field.registers = stringBuilder.toInt()
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                                5->{
-                                    field.family = stringBuilder
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                                6->{
-                                    field.design_tier = stringBuilder
-                                    itemCount++
-                                    stringBuilder = ""
-                                }
-                                7->{
-                                    field.lower_bound = stringBuilder.toInt()
-                                    stringBuilder = ""
-                                }
-                            }
-                            i++
-                        }
-                    }
-                    '[' -> i++
-                    ']' -> i++
-                    else -> {
-                        if (inDoubleCote && !comaFetched){
-                            stringBuilder += ch
-                        }else if (inDoubleCote && comaFetched){
-                            listBuilder.addLast(stringBuilder.toLong())
-                            stringBuilder = ""
-                            stringBuilder += ch
-                            comaFetched = false
-                        } else if(!inDoubleCote){
-                            stringBuilder += ch
-                        }
-
-                        if (inDoubleCote && !comaFetched && line[i+1] == ']'){
-                            listBuilder.addLast(stringBuilder.toLong())
-                            stringBuilder = ""
-                        }
+        while (i < line.length) {
+            val ch = line[i]
+            when {
+                ch == '"' -> {
+                    // Handle escaped double quotes ("") inside a quoted field
+                    if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+                        current.append('"')
                         i++
+                    } else {
+                        inQuotes = !inQuotes
                     }
                 }
+                ch == ',' && !inQuotes -> {
+                    fields.add(current.toString().trim())
+                    current.setLength(0)
+                }
+                else -> current.append(ch)
             }
-            PracticePuzzleList.addLast(field)
+            i++
         }
+        fields.add(current.toString().trim())
+        return fields
+    }
+
+    private fun parseLongList(raw: String): List<Long> {
+        val cleaned = raw.removeSurrounding("\"").trim().removeSurrounding("[", "]").trim()
+        if (cleaned.isEmpty()) return emptyList()
+        return cleaned.split(',').map { it.trim().toLong() }
+    }
+
+    fun ReadingPracticePuzzle(): MutableList<PracticePuzzleAccessStructure> {
+        val puzzles = ArrayList<PracticePuzzleAccessStructure>()
+
+        File(puzzle_file).bufferedReader().useLines { lines ->
+            var isHeader = true
+
+            for (line in lines) {
+                if (isHeader) {
+                    isHeader = false
+                    continue
+                }
+                if (line.isBlank()) continue
+
+                val cols = splitCsvLine(line)
+                require(cols.size >= 8) { "Unexpected column count (${cols.size}) in line: $line" }
+
+                val puzzle = PracticePuzzleAccessStructure(
+                    id = cols[0],
+                    starting_values = parseLongList(cols[1]),
+                    targets = parseLongList(cols[2]),
+                    value_limit = cols[3].toLong(),
+                    registers = cols[4].toInt(),
+                    family = cols[5],
+                    design_tier = cols[6],
+                    lower_bound = cols[7].toInt()
+                )
+                puzzles.add(puzzle)
+            }
+        }
+
+        return puzzles
     }
 }
