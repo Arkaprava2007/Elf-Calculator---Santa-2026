@@ -11,8 +11,8 @@ fun SolvingWithBeamSearch(
     Starting_Values: LongArray,
     id: String,
     registers: Int = 48,
-    beam_width: Int = 200,
-    maxSteps: Int = 400
+    beam_width: Int = 90,
+    maxSteps: Int = 50
 ): SimState? {
     if (Starting_Values.size > registers) {
         println("Too many Starting Values!!")
@@ -22,7 +22,7 @@ fun SolvingWithBeamSearch(
     val initialSlots = LongArray(registers) { index ->
         if (index < Starting_Values.size) Starting_Values[index] else 0L
     }
-    val initialTargets = targets.toSet()
+    val initialTargets = targets.toMutableSet()
     val startingFoundTargets = initialSlots.filter { it in initialTargets }.toSet()
 
     var beam = listOf(
@@ -61,16 +61,16 @@ fun SolvingWithBeamSearch(
 
         for (state in beam) {
             println("\t\t\t\tbeam loop")
-            for (i in 0 until registers) {
+            for (i in 0 until 16) {
                 println("\t\t\t\t\t\ti loop")
-                for (j in 0 until registers) {
+                for (j in 0 until 16) {
                     println("\t\t\t\t\t\t\t\tj loop")
                     for (operation in Operations.entries) {
                         println("\t\t\t\t\t\t\t\t\t\toperation loop")
                         if ((operation == Operations.ADD || operation == Operations.MULTIPLY) && j < i) {
                             continue
                         }
-                        for (saveIndex in 0 until registers) {
+                        for (saveIndex in 0 until 16) {
                             val instruction = Instruction(i, operation, j, saveIndex)
                             val newSlots = applyingInstructions(instruction, state.Slots) ?: continue
                             if (newSlots[saveIndex] == state.Slots[saveIndex]) continue
@@ -79,6 +79,7 @@ fun SolvingWithBeamSearch(
                             for (v in newSlots) {
                                 if (v in initialTargets) {
                                     updatedFound.add(v)
+                                    initialTargets.remove(v)
                                 }
                             }
 
@@ -89,7 +90,7 @@ fun SolvingWithBeamSearch(
                                 trace = ProgramNode(parent = state.trace, instruction = instruction)
                             )
 
-                            if (newState.found_targets.containsAll(initialTargets)) {
+                            if (initialTargets.isEmpty()) {
                                 return newState
                             }
 

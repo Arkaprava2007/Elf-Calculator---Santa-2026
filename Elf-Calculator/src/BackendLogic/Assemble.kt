@@ -32,6 +32,10 @@ class Assemble {
         PracticePuzzleSimState.clear()
         val practicePuzzlesList = practicePuzzleFileAccessOperation.ReadingPracticePuzzle()
 
+        /*for (pz in practicePuzzlesList) {
+            println("${pz.id}")
+        }*/
+
         var i = 0
 
         for (puzzle in practicePuzzlesList) {
