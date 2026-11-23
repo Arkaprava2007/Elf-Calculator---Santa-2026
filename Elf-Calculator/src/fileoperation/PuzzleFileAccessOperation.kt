@@ -1,7 +1,5 @@
 package fileoperation
 
-
-import datastructure.PracticePuzzleAccessStructure
 import datastructure.PuzzleAccessStructure
 import java.io.File
 
@@ -19,7 +17,6 @@ class PuzzleFileAccessOperation {
             val ch = line[i]
             when {
                 ch == '"' -> {
-                    // Handle escaped double quotes ("") inside a quoted field
                     if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
                         current.append('"')
                         i++
@@ -45,8 +42,8 @@ class PuzzleFileAccessOperation {
         return cleaned.split(',').map { it.trim().toLong() }
     }
 
-    fun ReadingPuzzle(): MutableList<PracticePuzzleAccessStructure> {
-        val puzzles = ArrayList<PracticePuzzleAccessStructure>()
+    fun ReadingPuzzle(): MutableList<PuzzleAccessStructure> {
+        val puzzles = ArrayList<PuzzleAccessStructure>()
 
         File(puzzle_file).bufferedReader().useLines { lines ->
             var isHeader = true
@@ -59,17 +56,14 @@ class PuzzleFileAccessOperation {
                 if (line.isBlank()) continue
 
                 val cols = splitCsvLine(line)
-                require(cols.size >= 8) { "Unexpected column count (${cols.size}) in line: $line" }
+                require(cols.size >= 5) { "Unexpected column count (${cols.size}) in line: $line" }
 
-                val puzzle = PracticePuzzleAccessStructure(
+                val puzzle = PuzzleAccessStructure(
                     id = cols[0],
                     starting_values = parseLongList(cols[1]),
                     targets = parseLongList(cols[2]),
                     value_limit = cols[3].toLong(),
-                    registers = cols[4].toInt(),
-                    family = cols[5],
-                    design_tier = cols[6],
-                    lower_bound = cols[7].toInt()
+                    registers = cols[4].toInt()
                 )
                 puzzles.add(puzzle)
             }

@@ -2,7 +2,9 @@ package BackendLogic
 
 import elements.Instruction
 import elements.Operations
+import elements.ProgramNode
 import elements.SimState
+import java.util.PriorityQueue
 
 fun SolvingWithBeamSearch(
     targets: MutableList<Long>,
@@ -12,64 +14,97 @@ fun SolvingWithBeamSearch(
     beam_width: Int = 200,
     maxSteps: Int = 400
 ): SimState? {
-    if (Starting_Values.size >= registers) {
-        print("Too many Starting Values!!")
+    if (Starting_Values.size > registers) {
+        println("Too many Starting Values!!")
         return null
     }
 
-    val SLOTS = LongArray(registers) { index ->
+    val initialSlots = LongArray(registers) { index ->
         if (index < Starting_Values.size) Starting_Values[index] else 0L
     }
-    val initial_targets = targets.toSet()
-    val found_targets = targets.filter { it in Starting_Values }.toSet()
+    val initialTargets = targets.toSet()
+    val startingFoundTargets = initialSlots.filter { it in initialTargets }.toSet()
 
-    var beam = listOf(SimState(id, SLOTS, found_targets, mutableListOf()))
+    var beam = listOf(
+        SimState(
+            id = id,
+            Slots = initialSlots,
+            found_targets = startingFoundTargets.toMutableSet(),
+            trace = null
+        )
+    )
 
-    beam.firstOrNull { it.found_targets.containsAll(initial_targets) }?.let { return it }
+    beam.firstOrNull { it.found_targets.containsAll(initialTargets) }?.let { return it }
 
     for (step in 1..maxSteps) {
-        val candidates = ArrayList<SimState>()
+        println("\t\tStep: $step")
+        // Max-heap ordered by largest (worst) score first so we keep only the best beam_width states
+        val topCandidates = PriorityQueue<Pair<Double, SimState>>(beam_width + 1) { a, b ->
+            b.first.compareTo(a.first)
+        }
+        val bestScoreByBoard = HashMap<Int, Double>()
+
+        fun offerCandidate(candidate: SimState) {
+            val score = heuristicScore(candidate, targets)
+            val boardKey = candidate.Slots.contentHashCode()
+            val prevBest = bestScoreByBoard[boardKey]
+            if (prevBest != null && score >= prevBest) return
+            bestScoreByBoard[boardKey] = score
+
+            if (topCandidates.size < beam_width) {
+                topCandidates.offer(score to candidate)
+            } else if (score < topCandidates.peek().first) {
+                topCandidates.poll()
+                topCandidates.offer(score to candidate)
+            }
+        }
 
         for (state in beam) {
+            println("\t\t\t\tbeam loop")
             for (i in 0 until registers) {
+                println("\t\t\t\t\t\ti loop")
                 for (j in 0 until registers) {
-                    for (Operation in Operations.entries) {
-                        for (save_Index in 10 until registers) {
-                            val instruction = Instruction(i, Operation, j, save_Index)
+                    println("\t\t\t\t\t\t\t\tj loop")
+                    for (operation in Operations.entries) {
+                        println("\t\t\t\t\t\t\t\t\t\toperation loop")
+                        if ((operation == Operations.ADD || operation == Operations.MULTIPLY) && j < i) {
+                            continue
+                        }
+                        for (saveIndex in 0 until registers) {
+                            val instruction = Instruction(i, operation, j, saveIndex)
                             val newSlots = applyingInstructions(instruction, state.Slots) ?: continue
+                            if (newSlots[saveIndex] == state.Slots[saveIndex]) continue
 
-                            val updatedFoundList = state.found_targets.toMutableSet()
-                            for (v in initial_targets){
-                                updatedFoundList.add(v)
+                            val updatedFound = state.found_targets.toMutableSet()
+                            for (v in newSlots) {
+                                if (v in initialTargets) {
+                                    updatedFound.add(v)
+                                }
                             }
-
-                            state.program.add(instruction)
-                            val _program = state.program
 
                             val newState = SimState(
                                 id = id,
-                                found_targets = updatedFoundList,
                                 Slots = newSlots,
-                                program = _program,
+                                found_targets = updatedFound,
+                                trace = ProgramNode(parent = state.trace, instruction = instruction)
                             )
 
-                            if (newState.found_targets.containsAll(initial_targets)){
+                            if (newState.found_targets.containsAll(initialTargets)) {
                                 return newState
                             }
 
-                            candidates.add(newState)
+                            offerCandidate(newState)
                         }
                     }
                 }
             }
         }
 
-        if (candidates.isEmpty()) return null
+        if (topCandidates.isEmpty()) return null
 
-        beam = candidates
-            .sortedBy { heuristicScore(it,targets) }
-            .take(beam_width)
-
+        beam = topCandidates
+            .sortedBy { it.first }
+            .map { it.second }
     }
 
     return null

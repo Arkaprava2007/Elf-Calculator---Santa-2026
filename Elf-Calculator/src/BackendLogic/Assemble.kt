@@ -1,5 +1,6 @@
 package BackendLogic
 
+import elements.Instruction
 import elements.Operations
 import elements.SimState
 import fileoperation.PracticePuzzleFileAccessOperation
@@ -15,79 +16,74 @@ class Assemble {
     val PracticePuzzleSimState: MutableList<SimState> = mutableListOf()
     val PuzzleSimState: MutableList<SimState> = mutableListOf()
 
-    fun SolvingPractice_Puzzles(){
+    private fun formatProgram(instructions: List<Instruction>): String {
+        return instructions.joinToString(",") { inst ->
+            val operator = when (inst.operation) {
+                Operations.ADD -> '+'
+                Operations.SUBTRACT -> '-'
+                Operations.MULTIPLY -> '*'
+                Operations.DIVIDE -> '/'
+            }
+            "[\"$operator\",${inst.a_position},${inst.b_position},${inst.save_index}]"
+        }
+    }
 
-        val practice_puzzles_list = practicePuzzleFileAccessOperation.ReadingPracticePuzzle()
+    fun SolvingPractice_Puzzles() {
+        PracticePuzzleSimState.clear()
+        val practicePuzzlesList = practicePuzzleFileAccessOperation.ReadingPracticePuzzle()
 
-        for (Puzzle in practice_puzzles_list){
+        var i = 0
+
+        for (puzzle in practicePuzzlesList) {
+
+            println("$i. Loop is running")
             val simState = SolvingWithBeamSearch(
-                targets = Puzzle.targets.toMutableList(),
-                Starting_Values = Puzzle.starting_values.toLongArray(),
-                id = Puzzle.id,
-                registers = Puzzle.registers,
+                targets = puzzle.targets.toMutableList(),
+                Starting_Values = puzzle.starting_values.toLongArray(),
+                id = puzzle.id,
+                registers = puzzle.registers,
             )
 
-            simState?.let { PracticePuzzleSimState.addLast(it) }
+            simState?.let { PracticePuzzleSimState.add(it) }
+            i++
         }
 
         submissionFileOperation.SubmissionList.clear()
 
-        for (simState in PracticePuzzleSimState ){
-            var programStringBuilder = ""
-
-            for (instructions in simState.program){
-
-                val operator = when (instructions.operation) {
-                    Operations.ADD -> '+'
-                    Operations.SUBTRACT -> '-'
-                    Operations.MULTIPLY -> '*'
-                    Operations.DIVIDE -> '/'
-                }
-
-                programStringBuilder += "[\"${operator}\",${instructions.a_position},${instructions.b_position},${instructions.save_index}],"
-            }
-
+        for (simState in PracticePuzzleSimState) {
             submissionFileOperation.addSubmission(
                 id = simState.id,
-                program = programStringBuilder
+                program = formatProgram(simState.trace!!.toInstructionList())
             )
         }
 
         submissionFileOperation.CSV_File_Generator_For_Submission_AS_Output()
-
     }
 
-    fun SolvingPuzzles(){
-        val puzzle_list = puzzleFileAccessOperation.ReadingPuzzle()
+    fun SolvingPuzzles() {
+        PuzzleSimState.clear()
+        val puzzleList = puzzleFileAccessOperation.ReadingPuzzle()
 
-        for (Puzzle in puzzle_list){
+        for (puzzle in puzzleList) {
             val simState = SolvingWithBeamSearch(
-                targets = Puzzle.targets.toMutableList(),
-                Starting_Values = Puzzle.starting_values.toLongArray(),
-                id = Puzzle.id,
-                registers = Puzzle.registers,
+                targets = puzzle.targets.toMutableList(),
+                Starting_Values = puzzle.starting_values.toLongArray(),
+                id = puzzle.id,
+                registers = puzzle.registers,
             )
 
-            simState?.let { PuzzleSimState.addLast(it) }
+            simState?.let { PuzzleSimState.add(it) }
         }
 
         submissionFileOperation.SubmissionList.clear()
 
-        for (simState in PuzzleSimState ){
-            var programStringBuilder = ""
-
-            for (instructions in simState.program){
-                programStringBuilder += "[\"${instructions.operation}\",${instructions.a_position},${instructions.b_position},${instructions.save_index}]"
-            }
-
+        for (simState in PuzzleSimState) {
             submissionFileOperation.addSubmission(
                 id = simState.id,
-                program = programStringBuilder
+                program = formatProgram(simState.trace!!.toInstructionList())
             )
         }
+
         submissionFileOperation.CSV_File_Generator_For_Submission_AS_Output()
     }
-
-
-
 }
